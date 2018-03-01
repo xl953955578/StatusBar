@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Environment;
 import android.support.v4.widget.DrawerLayout;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -28,6 +29,7 @@ public class StatusBarUtils {
     private static final String KEY_MIUI_VERSION_CODE = "ro.miui.ui.version.code";
     private static final String KEY_MIUI_VERSION_NAME = "ro.miui.ui.version.name";
     private static final String KEY_MIUI_INTERNAL_STORAGE = "ro.miui.internal.storage";
+    private static String sMiuiVersionName;
 
     /**
      * 通过设置全屏，设置状态栏透明
@@ -189,6 +191,10 @@ public class StatusBarUtils {
         try {
             stream = new FileInputStream(new File(Environment.getRootDirectory(), "build.prop"));
             prop.load(stream);
+            String name = prop.getProperty(KEY_MIUI_VERSION_NAME, null);
+            if(name!=null){
+                sMiuiVersionName = name.toLowerCase();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return false;
@@ -206,6 +212,14 @@ public class StatusBarUtils {
                 || prop.getProperty(KEY_MIUI_VERSION_NAME, null) != null
                 || prop.getProperty(KEY_MIUI_INTERNAL_STORAGE, null) != null;
         return isMIUI;
+    }
+
+    public static boolean isPreMIUI9(){
+        if(TextUtils.isEmpty(sMiuiVersionName)){
+            return false;
+        }
+        int version =  Integer.valueOf(sMiuiVersionName.substring(1));
+        return version < 9;
     }
 
     public static boolean isFlyme() {
@@ -240,21 +254,22 @@ public class StatusBarUtils {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT;
     }
 
-    static boolean setMiuiStatusBarDarkMode(Activity activity, boolean darkmode) {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            setDarkModeAfterM(activity, darkmode);
-        }
-        Class<? extends Window> clazz = activity.getWindow().getClass();
-        try {
-            int darkModeFlag = 0;
-            Class<?> layoutParams = Class.forName("android.view.MiuiWindowManager$LayoutParams");
-            Field field = layoutParams.getField("EXTRA_FLAG_STATUS_BAR_DARK_MODE");
-            darkModeFlag = field.getInt(layoutParams);
-            Method extraFlagField = clazz.getMethod("setExtraFlags", int.class, int.class);
-            extraFlagField.invoke(activity.getWindow(), darkmode ? darkModeFlag : 0, darkModeFlag);
-            return true;
-        } catch (Exception e) {
-            e.printStackTrace();
+    public static boolean setMiuiStatusBarDarkMode(Activity activity, boolean darkmode) {
+        if(isPreM()||isPreMIUI9()){
+            Class<? extends Window> clazz = activity.getWindow().getClass();
+            try {
+                int darkModeFlag = 0;
+                Class<?> layoutParams = Class.forName("android.view.MiuiWindowManager$LayoutParams");
+                Field field = layoutParams.getField("EXTRA_FLAG_STATUS_BAR_DARK_MODE");
+                darkModeFlag = field.getInt(layoutParams);
+                Method extraFlagField = clazz.getMethod("setExtraFlags", int.class, int.class);
+                extraFlagField.invoke(activity.getWindow(), darkmode ? darkModeFlag : 0, darkModeFlag);
+                return true;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }else {
+            setDarkModeAfterM(activity,darkmode);
         }
         return false;
     }
